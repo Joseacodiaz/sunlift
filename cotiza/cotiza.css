@@ -149,6 +149,39 @@
 .cot-carro-total span{font-size:.78rem;color:rgba(255,255,255,.6)}
 .cot-carro-total b{font-size:1.35rem;font-weight:800;color:var(--c-lime);font-variant-numeric:tabular-nums}
 .cot-carro>small{font-size:.75rem;color:rgba(255,255,255,.5);line-height:1.4}
+/* Boleta: subida opcional (en el gasto y como recordatorio antes de terminar) */
+.cot-boleta{display:flex;align-items:center;gap:.9rem;margin-top:1.1rem;padding:.9rem 1rem;border-radius:1rem;border:1.5px dashed rgba(182,243,68,.55);background:rgba(182,243,68,.06);cursor:pointer;transition:background .2s,border-color .2s}
+.cot-boleta:hover{background:rgba(182,243,68,.12)}
+.cot-boleta .ico{flex:none;width:2.6rem;height:2.6rem;border-radius:.75rem;display:grid;place-items:center;background:rgba(255,255,255,.08);color:var(--c-lime)}
+.cot-boleta .ico svg{width:1.35rem;height:1.35rem}
+.cot-boleta b{display:block;font-size:.95rem}
+.cot-boleta small{display:block;color:rgba(255,255,255,.6);font-size:.82rem;margin-top:.1rem}
+.cot-boleta-btn{margin-left:auto;flex:none;padding:.45rem .9rem;border-radius:99px;background:var(--c-lime);color:var(--c-ink);font-weight:700;font-size:.82rem}
+.cot-boleta.lista{border-style:solid;border-color:var(--c-lime)}
+.cot-boleta.lista .cot-boleta-btn{background:rgba(182,243,68,.15);color:var(--c-lime)}
+.cot-boleta-aviso{margin-top:1.2rem;padding:1rem 1.1rem;border-radius:1rem;background:rgba(255,255,255,.05)}
+.cot-boleta-aviso p{margin:0;font-size:.92rem;line-height:1.45;color:rgba(255,255,255,.8)}
+.cot-boleta-aviso .cot-boleta{margin-top:.8rem}
+/* Financiamiento */
+.cot-fin{margin-top:1.25rem;padding-top:1.1rem;border-top:1px solid rgba(255,255,255,.1);display:grid;gap:1rem}
+.cot-fin-cab{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem}
+.cot-fin-cab .cot-unidad{margin:0}
+.cot-fin .etq{font-size:.78rem;font-weight:700;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:.06em;font-family:var(--font-label,system-ui)}
+.cot-fin-ctrl{display:grid;gap:1rem}
+@media (min-width:760px){.cot-fin-ctrl{grid-template-columns:auto 1fr;gap:2rem;align-items:end}}
+.cot-fin-ctrl .cot-bats{margin-top:.5rem}
+.cot-tasa{display:grid;gap:.55rem}
+.cot-tasa output{color:#fff;margin-left:.35rem;letter-spacing:0;text-transform:none;font-variant-numeric:tabular-nums}
+.cot-tasa input{width:100%;accent-color:var(--c-lime)}
+.cot-fin-res{display:grid;grid-template-columns:repeat(3,1fr);gap:.8rem}
+.cot-fin-res span{display:block;font-size:.75rem;font-weight:600;color:rgba(255,255,255,.55)}
+.cot-fin-res b{display:block;margin-top:.2rem;font-size:1.25rem;font-weight:800;font-variant-numeric:tabular-nums}
+.cot-fin-res .neto b{color:var(--c-lime)}
+.cot-fin-res .neto.falta b{color:#ffcf6b}
+.cot-fin-msj{margin:0;font-size:.95rem;line-height:1.45;font-weight:600}
+.cot-fin-letra{font-size:.74rem;color:rgba(255,255,255,.45);line-height:1.45}
+.cot-card .credito{margin:-.35rem 0 0;font-size:.82rem;color:rgba(255,255,255,.7)}
+.cot-card .credito b{color:var(--c-lime)}
 .cot-hp{position:absolute!important;left:-9999px!important;width:1px;height:1px;overflow:hidden}
 
 @media (prefers-reduced-motion:reduce){.cot *{animation:none!important;transition:none!important}}

@@ -10,7 +10,7 @@
   const PUENTE = 'https://sunlift.netlify.app/api/cotizacion'; // reenvía a la consola de propuestas de Tito
   const ORDEN = ['ubicacion', 'mapa', 'uso', 'condominio', 'boleta', 'gasto', 'temporada', 'medidor', 'contacto'];
   const pasos = Object.fromEntries([...caja.querySelectorAll('.cot-paso')].map(p => [p.dataset.paso, p]));
-  const d = { region: '', comuna: '', direccion: '', punto: null, uso: '', condominio: '', lote: '', boleta: '', unidad: 'clp', gasto: 0, metros: 15, motivo: '', temporada: '' };
+  const d = { region: '', comuna: '', direccion: '', punto: null, uso: '', condominio: '', lote: '', boleta: '', unidad: 'clp', gasto: 0, metros: 15, motivo: '', temporada: '', archivo: null, pago: 'credito', plazo: 60, tasa: 1 };
   let P = null, actual = 'ubicacion', historial = [], mapa = null, opciones = [], elegida = 1, ctx = null, arma = null;
 
   const fmt = n => Math.round(n).toLocaleString('es-CL');
@@ -164,6 +164,24 @@
   grupo('temporada', v => { d.temporada = v; luego(() => ir('medidor')); });
   unidad('clp');
 
+  // ---- Boleta: opcional, en el paso del gasto y como recordatorio antes del contacto
+  const archivo = $('cotArchivo');
+  const TIPOS = /^(image\/(jpeg|png|webp|heic|heif)|application\/pdf)$/;
+  archivo.addEventListener('change', () => {
+    const f = archivo.files[0];
+    $('cotArchivoErr').textContent = '';
+    if (!f) return;
+    if (!TIPOS.test(f.type) && !/\.(heic|heif)$/i.test(f.name)) { $('cotArchivoErr').textContent = 'Sube una foto (JPG, PNG o HEIC) o un PDF.'; archivo.value = ''; return; }
+    if (f.size > 7.5 * 1024 * 1024) { $('cotArchivoErr').textContent = 'El archivo pesa más de 7,5 MB. Prueba con una foto o un PDF más liviano.'; archivo.value = ''; return; }
+    d.archivo = f;
+    caja.querySelectorAll('[data-boleta]').forEach(l => {
+      l.classList.add('lista');
+      l.querySelector('[data-boleta-estado]').textContent = 'Cambiar';
+      l.querySelector('[data-boleta-sub]').textContent = '✓ ' + (f.name.length > 34 ? f.name.slice(0, 31) + '…' : f.name);
+    });
+    vivo('Boleta lista: ' + f.name);
+  });
+
   // ---- 7 · Distancia al medidor
   grupo('medidor', v => { d.metros = +v; luego(() => ir('contacto')); });
 
@@ -260,6 +278,9 @@
       b.querySelector('h3').textContent = o.nombre;
       b.querySelector('.sub').textContent = o.sub;
       b.querySelector('.precio').innerHTML = `${plata(o.total)}<small>Precio con IVA, instalado</small>`;
+      const cr = document.createElement('p'); cr.className = 'credito';
+      cr.innerHTML = `o <b>$${fmt(Math.round(cuota(o.total, 1, 60) / 1000) * 1000)} al mes</b> con crédito verde*`;
+      b.querySelector('.precio').after(cr);
       b.querySelector('.cubre i').style.width = Math.round(o.cubre * 100) + '%';
       b.querySelector('[data-k="ahorro"]').textContent = '$' + fmt(Math.round(o.ahorroMes / 1000) * 1000);
       b.querySelector('[data-k="retorno"]').textContent = o.retorno.toLocaleString('es-CL', { maximumFractionDigits: 1 }) + ' años';
@@ -310,7 +331,30 @@
     poner('cotRCubre', Math.round(o.cubre * 100) + '%');
     $('cotRBarra').style.width = Math.round(o.cubre * 100) + '%';
     pintarCarro(o);
+    pintarFin(o);
   }
+
+  // ---- Financiamiento: contado o crédito verde (cuota fija; la tasa es de ejemplo y la ajusta la persona)
+  const cuota = (monto, tasaMes, n) => { const r = tasaMes / 100; return r === 0 ? monto / n : monto * r / (1 - Math.pow(1 + r, -n)); };
+  function pintarFin(o) {
+    caja.querySelectorAll('[data-pago]').forEach(b => b.setAttribute('aria-pressed', b.dataset.pago === d.pago));
+    $('cotFin').hidden = d.pago !== 'credito';
+    $('cotPlazos').querySelectorAll('[data-plazo]').forEach(b => b.setAttribute('aria-pressed', +b.dataset.plazo === d.plazo));
+    $('cotTasaTxt').textContent = d.tasa.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
+    if (d.pago !== 'credito') return;
+    const c = cuota(o.total, d.tasa, d.plazo), neto = o.ahorroMes - c;
+    $('cotCuota').textContent = '$' + fmt(Math.round(c / 1000) * 1000);
+    $('cotFinAhorro').textContent = '$' + fmt(Math.round(o.ahorroMes / 1000) * 1000);
+    $('cotNeto').textContent = (neto >= 0 ? '+$' : '−$') + fmt(Math.round(Math.abs(neto) / 1000) * 1000);
+    $('cotNetoEtq').textContent = neto >= 0 ? 'Te queda al mes' : 'Pones al mes';
+    $('cotNeto').parentElement.classList.toggle('falta', neto < 0);
+    $('cotFinMsj').textContent = neto >= 0
+      ? 'Tu ahorro en la cuenta de la luz paga la cuota: el sistema se paga solo desde el primer mes.'
+      : `Pones unos $${fmt(Math.round(-neto / 1000) * 1000)} al mes durante el crédito; cuando termine, te ahorras $${fmt(Math.round(o.ahorroMes / 1000) * 1000)} todos los meses.`;
+  }
+  caja.querySelectorAll('[data-pago]').forEach(b => b.addEventListener('click', () => { d.pago = b.dataset.pago; pintarFin(arma.resultado); }));
+  $('cotPlazos').addEventListener('click', e => { const b = e.target.closest('[data-plazo]'); if (!b) return; d.plazo = +b.dataset.plazo; pintarFin(arma.resultado); });
+  $('cotTasa').addEventListener('input', e => { d.tasa = +e.target.value; pintarFin(arma.resultado); });
 
   // ---- Carrito «Tu sistema»: lo que incluye la propuesta armada (sin precios por ítem; solo el total)
   let carroAntes = new Set();
@@ -409,8 +453,18 @@
       total_sin_bateria: s ? Math.round(s.total) : '', total_con_bateria: c ? Math.round(c.total) : '',
       ahorro_mes_sin_bateria: s ? Math.round(s.ahorroMes) : '', ahorro_mes_con_bateria: c ? Math.round(c.ahorroMes) : '',
       bateria: elegidaOp ? `QUIERE VISITA · ${elegidaOp.nombre} · ${elegidaOp.paneles} paneles · ${elegidaOp.bat ? 'batería ' + elegidaOp.bat.kwh + ' kWh' : 'sin batería'} · ${plata(elegidaOp.total)}` : '',
-      techo: 'web de José (GitHub Pages)',
+      techo: 'web de José (GitHub Pages)' + (d.archivo ? ' · subió boleta' : ''),
+      financiamiento: elegidaOp ? (d.pago === 'credito' ? `crédito verde ${d.plazo} meses, tasa ejemplo ${d.tasa}% · cuota ~${plata(cuota(elegidaOp.total, d.tasa, d.plazo))}` : 'al contado') : '',
     };
+    // Con boleta va como multipart (Netlify guarda el archivo); se adjunta solo en el primer envío
+    if (d.archivo && !d.archivoEnviado) {
+      const fd = new FormData();
+      for (const [k, v] of Object.entries(datos)) fd.append(k, v ?? '');
+      fd.append('boleta', d.archivo, d.archivo.name);
+      d.archivoEnviado = true;
+      fetch(LEADS, { method: 'POST', mode: 'no-cors', body: fd }).catch(() => {});
+      return;
+    }
     fetch(LEADS, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(datos).toString() }).catch(() => {});
   }
 
