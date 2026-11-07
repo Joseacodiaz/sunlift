@@ -7,6 +7,7 @@
   const BASE = document.getElementById('cotiza').dataset.base || '/';
   const quieto = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const LEADS = 'https://sunlift.netlify.app/'; // formulario "cotizacion" de Netlify
+  const PUENTE = 'https://sunlift.netlify.app/api/cotizacion'; // reenvía a la consola de propuestas de Tito
   const ORDEN = ['ubicacion', 'mapa', 'uso', 'condominio', 'boleta', 'gasto', 'temporada', 'medidor', 'contacto'];
   const pasos = Object.fromEntries([...caja.querySelectorAll('.cot-paso')].map(p => [p.dataset.paso, p]));
   const d = { region: '', comuna: '', direccion: '', punto: null, uso: '', condominio: '', lote: '', boleta: '', unidad: 'clp', gasto: 0, metros: 15, motivo: '', temporada: '' };
@@ -355,7 +356,29 @@
     const p = $('cotCierreTxt');
     p.append('¡Listo! Te vamos a escribir al ', Object.assign(document.createElement('b'), { textContent: d.contacto.telefono }), ` para coordinar la visita técnica de tu propuesta (${o.paneles} paneles${o.bat ? ' y batería de ' + o.bat.kwh.toLocaleString('es-CL') + ' kWh' : ''}, ${plata(o.total)}). Cuesta $50.000 y se descuenta si instalas.`);
     $('cotAgendar').hidden = true;
+    aConsola(o);
   });
+
+  // ---- La propuesta armada viaja a la consola de Tito (vía el puente de Netlify, que guarda el token)
+  async function aConsola(o) {
+    const lugar = d.punto || d.referencia;
+    const cuerpo = {
+      cliente: { nombre: d.contacto.nombre, telefono: d.contacto.telefono, correo: d.contacto.correo || undefined },
+      ubicacion: { direccion: d.direccion, comuna: d.comuna, region: d.region, ...(lugar ? { lat: lugar[0], lng: lugar[1] } : {}) },
+      vivienda: { tipo: 'casa', condominio: d.condominio === 'si', ...(d.lote ? { lote: d.lote } : {}) },
+      consumo: { monto: d.gasto, unidad: d.unidad, temporada: d.temporada },
+      instalacion: { metrosAlMedidor: d.metros },
+      propuesta: { paneles: o.paneles, conBateria: !!o.bat, ...(o.bat ? { bateriaKwh: o.bat.kwh } : {}) },
+    };
+    try {
+      const r = await fetch(PUENTE, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) });
+      const res = await r.json();
+      if (res.propuestaUrl && /^https:\/\//.test(res.propuestaUrl)) {
+        const a = Object.assign(document.createElement('a'), { href: res.propuestaUrl, target: '_blank', rel: 'noopener', className: 'cot-sig', textContent: 'Ver mi propuesta →' });
+        $('cotCierreTxt').after(a);
+      }
+    } catch { /* el lead ya llegó por el formulario; la consola puede recibirlo después */ }
+  }
   $('cotRehacer').addEventListener('click', () => {
     historial = [];
     caja.querySelector('.cot-cierre').hidden = false; $('cotArma').hidden = false; $('cotAgendar').hidden = false; $('cotCierreTxt').innerHTML = cierreOriginal;
