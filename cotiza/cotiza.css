@@ -1,4 +1,18 @@
 /* Cotizador de SunLift: va justo debajo del banner principal. Usa los tokens de la página (tema Astro). */
+/* Aviso «cotiza aquí»: entra desde abajo al cargar y da un salto suave cada pocos segundos */
+.cot-asoma{position:fixed;z-index:40;left:clamp(1rem,3.5vw,3rem);bottom:clamp(1rem,4vh,2.5rem);display:flex;align-items:center;gap:.85rem;padding:.75rem .8rem .75rem 1.1rem;border-radius:1.1rem;background:var(--color-ink,#1c1c1c);color:#fff;text-decoration:none;box-shadow:0 18px 40px -16px rgba(0,0,0,.55),0 0 0 1px rgba(182,243,68,.35);transform:translateY(160%);opacity:0;transition:transform .7s cubic-bezier(.34,1.56,.64,1),opacity .4s ease;font-family:var(--font-sans,system-ui)}
+.cot-asoma.on{transform:none;opacity:1;animation:cotSalta 4.2s cubic-bezier(.34,1.56,.64,1) 1.2s infinite}
+.cot-asoma.fuera{transform:translateY(160%)!important;opacity:0;pointer-events:none;animation:none}
+.cot-asoma b{display:block;font-size:.95rem;font-weight:800;letter-spacing:-.01em}
+.cot-asoma small{display:block;font-size:.78rem;color:rgba(255,255,255,.65);margin-top:.1rem}
+.cot-asoma-flecha{flex:none;display:grid;place-items:center;width:2.4rem;height:2.4rem;border-radius:50%;background:#b6f344;color:#1c1c1c}
+.cot-asoma-flecha svg{width:1.15rem;height:1.15rem;animation:cotFlecha 1.6s ease-in-out infinite}
+.cot-asoma:hover .cot-asoma-flecha{transform:scale(1.08)}
+@keyframes cotSalta{0%,70%,100%{transform:translateY(0)}78%{transform:translateY(-12px)}86%{transform:translateY(0)}92%{transform:translateY(-5px)}}
+@keyframes cotFlecha{0%,100%{transform:translateY(-2px)}50%{transform:translateY(3px)}}
+.cot-asoma .corto{display:none}
+@media (max-width:767px){.cot-asoma{left:auto;right:1rem;bottom:1rem;padding:.55rem .55rem .55rem 1rem;gap:.6rem}.cot-asoma small,.cot-asoma .largo{display:none}.cot-asoma .corto{display:inline}.cot-asoma-flecha{width:2.1rem;height:2.1rem}}
+@media (prefers-reduced-motion:reduce){.cot-asoma,.cot-asoma.on{animation:none;transition:opacity .3s}.cot-asoma-flecha svg{animation:none}}
 .cot{--c-ink:var(--color-ink,#1c1c1c);--c-ink2:var(--color-ink-2,#252525);--c-cream:var(--color-cream,#efedde);--c-lime:var(--color-lime,#b6f344);--c-dim:var(--color-dim,#9c9b90);--c-mist:var(--color-mist,#d4d2c4);--ease:var(--ease-lifty,cubic-bezier(.16,1,.3,1));
   background:var(--c-cream);color:var(--c-ink);padding-block:clamp(3.5rem,9vh,6.5rem);scroll-margin-top:4rem}
 .cot *{box-sizing:border-box}
