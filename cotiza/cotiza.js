@@ -414,5 +414,22 @@
     fetch(LEADS, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(datos).toString() }).catch(() => {});
   }
 
+  // Segunda entrada (debajo de «Un día con SunLift»): trae región, comuna y dirección y sigue aquí, en el mapa
+  let listo; const cargado = new Promise(r => { listo = r; });
+  const esperar = setInterval(() => { if (P) { clearInterval(esperar); listo(); } }, 100);
+  window.SunLiftCotiza = {
+    cargado,
+    regiones: () => [...selR.options].slice(1).map(o => [o.value, o.text]),
+    comunas: region => Object.keys(P.comunas).filter(c => P.comunas[c][0] === region).sort((a, b) => a.localeCompare(b, 'es')),
+    empezar(region, comuna, direccion) {
+      selR.value = region; selR.dispatchEvent(new Event('change'));
+      selC.value = comuna; selC.dispatchEvent(new Event('change'));
+      dir.value = direccion; validar1();
+      historial = []; d.direccion = direccion.trim();
+      ir('mapa');
+      caja.scrollIntoView({ behavior: quieto ? 'auto' : 'smooth', block: 'start' });
+    },
+  };
+
   ir('ubicacion', true);
 })();
