@@ -323,7 +323,7 @@
     ];
     if (cero <= 1) opciones.shift();
     enviar(opciones);
-    setTimeout(() => { clearInterval(reloj); pintar(); ir('resultado'); }, quieto ? 300 : 2700);
+    setTimeout(() => { clearInterval(reloj); pintar(); ir('resultado'); crearLink(); }, quieto ? 300 : 2700);
   }
 
   // ---- 10 · Resultado: tarjetas con imagen; se elige una y se agenda la visita
@@ -457,15 +457,43 @@
   $('cotMenos').addEventListener('click', () => { arma.paneles--; pintarArma(); });
   $('cotMas').addEventListener('click', () => { arma.paneles++; pintarArma(); });
   $('cotBats').addEventListener('click', e => { const x = e.target.closest('[data-bat]'); if (!x) return; arma.bat = x.dataset.bat === '' ? null : +x.dataset.bat; pintarArma(); });
-  const cierreOriginal = $('cotCierreTxt').innerHTML;
-  $('cotAgendar').addEventListener('click', () => {
-    const o = { nombre: arma.nombre, ...arma.resultado };
+  // ---- Avanzar: visita, llamada o que el bot de WhatsApp coordine. Va al lead y al contador del link
+  const TEXTO_AVANZA = {
+    visita: tel => `¡Listo! Te escribimos al ${tel} para agendar la visita técnica.`,
+    llamada: tel => `¡Listo! Te llamamos al ${tel} para conversar tu propuesta y, si te tinca, agendar la visita.`,
+    bot: tel => `¡Listo! Te escribimos por WhatsApp al ${tel} para coordinar una llamada y después la visita.`,
+  };
+  caja.querySelectorAll('[data-avanza]').forEach(b => b.addEventListener('click', () => {
+    const tipo = b.dataset.avanza, o = { nombre: arma.nombre, ...arma.resultado };
+    d.siguiente = { visita: 'agendar visita técnica', llamada: 'prefiere una llamada', bot: 'que el bot coordine por WhatsApp' }[tipo];
     enviar(opciones, o);
-    $('cotCierreTxt').innerHTML = '';
-    const p = $('cotCierreTxt');
-    p.append('¡Listo! Te vamos a escribir al ', Object.assign(document.createElement('b'), { textContent: d.contacto.telefono }), ` para coordinar la visita técnica de tu propuesta (${o.paneles} paneles${o.bat ? ' y batería de ' + o.bat.kwh.toLocaleString('es-CL') + ' kWh' : ''}, ${plata(o.total)}). Cuesta $50.000 y se descuenta si instalas.`);
-    $('cotAgendar').hidden = true;
-    aConsola(o);
+    evento(tipo);
+    $('cotAvanzaMsj').textContent = TEXTO_AVANZA[tipo](d.contacto.telefono);
+    caja.querySelectorAll('[data-avanza]').forEach(x => x.setAttribute('aria-pressed', x === b));
+    if (tipo === 'visita') aConsola(o);
+  }));
+
+  // ---- Link propio de la propuesta (Netlify Blobs) para mandarla por WhatsApp o correo y contar aperturas
+  const PROPUESTAS = 'https://sunlift.netlify.app/api/propuesta';
+  const evento = tipo => { if (d.idLink) fetch(PROPUESTAS + '/evento', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: d.idLink, tipo }) }).catch(() => {}); };
+  async function crearLink() {
+    try {
+      const r = await fetch(PROPUESTAS, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+        nombre: d.contacto.nombre.split(' ')[0], comuna: d.comuna,
+        cuenta_luz: d.unidad === 'clp' ? '$' + fmt(d.gasto) : fmt(d.gasto) + ' kWh',
+        opciones, elegida,
+      }) });
+      const { id } = await r.json(); if (!id) return;
+      d.idLink = id; d.link = location.origin + BASE + 'p/?id=' + id;
+      const txt = `Mi propuesta solar de SunLift: ${d.link}`;
+      $('cotWa').href = 'https://wa.me/?text=' + encodeURIComponent(txt);
+      $('cotMail').href = 'mailto:' + (d.contacto.correo || '') + '?subject=' + encodeURIComponent('Mi propuesta solar de SunLift') + '&body=' + encodeURIComponent(txt);
+      $('cotCompartir').hidden = false;
+    } catch { /* sin link igual se puede avanzar */ }
+  }
+  caja.querySelectorAll('[data-evento]').forEach(a => a.addEventListener('click', () => evento(a.dataset.evento)));
+  $('cotCopiar').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(d.link); $('cotCopiar').textContent = '¡Copiado!'; } catch { prompt('Copia tu link:', d.link); }
   });
 
   // ---- La propuesta armada viaja a la consola de Tito (vía el puente de Netlify, que guarda el token)
@@ -484,13 +512,15 @@
       const res = await r.json();
       if (res.propuestaUrl && /^https:\/\//.test(res.propuestaUrl)) {
         const a = Object.assign(document.createElement('a'), { href: res.propuestaUrl, target: '_blank', rel: 'noopener', className: 'cot-sig', textContent: 'Ver mi propuesta →' });
-        $('cotCierreTxt').after(a);
+        $('cotAvanzaMsj').after(a);
       }
     } catch { /* el lead ya llegó por el formulario; la consola puede recibirlo después */ }
   }
   $('cotRehacer').addEventListener('click', () => {
     historial = [];
-    caja.querySelector('.cot-cierre').hidden = false; $('cotArma').hidden = false; $('cotAgendar').hidden = false; $('cotCierreTxt').innerHTML = cierreOriginal;
+    $('cotAvanza').hidden = false; $('cotAjustar').hidden = false; $('cotCompartir').hidden = true;
+    $('cotAvanzaMsj').textContent = 'Elige cómo seguimos con la opción que marcaste.';
+    caja.querySelectorAll('[data-avanza]').forEach(x => x.removeAttribute('aria-pressed'));
     ir('ubicacion', true);
   });
 
@@ -499,8 +529,8 @@
     $('cotResTitulo').textContent = `Gracias, ${d.contacto.nombre.split(' ')[0]}`;
     $('cotResDato').textContent = 'Un especialista te escribe por WhatsApp para ver tu caso.';
     $('cotOpciones').textContent = '';
-    $('cotArma').hidden = true;
-    caja.querySelector('.cot-cierre').hidden = true;
+    $('cotAjustar').hidden = true;
+    $('cotAvanza').hidden = true;
   }
 
   // ---- Envío del lead al formulario "cotizacion" de Netlify (los name calzan con ese formulario)
@@ -519,6 +549,7 @@
       ahorro_mes_sin_bateria: s ? Math.round(s.ahorroMes) : '', ahorro_mes_con_bateria: c ? Math.round(c.ahorroMes) : '',
       bateria: elegidaOp ? `QUIERE VISITA · ${elegidaOp.nombre} · ${elegidaOp.paneles} paneles · ${elegidaOp.bat ? 'batería ' + elegidaOp.bat.kwh + ' kWh' : 'sin batería'} · ${plata(elegidaOp.total)}` : '',
       techo: 'web de José (GitHub Pages)' + (d.archivo ? ' · subió boleta' : ''),
+      link: d.link || '', siguiente: d.siguiente || '',
       financiamiento: elegidaOp ? (d.pago === 'credito' ? `crédito verde ${d.plazo} meses, tasa ejemplo ${d.tasa}% · cuota ~${plata(cuota(elegidaOp.total, d.tasa, d.plazo))}` : 'al contado') : '',
     };
     // Con boleta va como multipart (Netlify guarda el archivo); se adjunta solo en el primer envío
