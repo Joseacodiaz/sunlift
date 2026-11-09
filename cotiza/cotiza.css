@@ -243,6 +243,14 @@
 .cot-modal .cot-caja{margin:0 auto}
 .cot-modal-x{position:sticky;top:0;float:right;z-index:2;width:2.6rem;height:2.6rem;margin:0 0 -2.6rem;border-radius:50%;border:0;background:#fff;color:#1c1c1c;font-size:1.5rem;line-height:1;cursor:pointer;box-shadow:0 6px 20px -8px rgba(0,0,0,.5)}
 html.cot-abierto{overflow:hidden}
+/* Boleta leída: «Últimos detalles» junta lo que la boleta no trae */
+.cot-solo-leida{display:none}
+.leida .cot-solo-leida{display:revert}
+.leida .cot-no-leida{display:none}
+.cot-det{gap:1rem;margin-bottom:1.2rem}
+.leida .cot-det{display:grid}
+.cot-det-g>span:first-child{display:block;font-size:.85rem;font-weight:600;color:rgba(255,255,255,.8);margin-bottom:.45rem}
+.cot-det-g[hidden]{display:none}
 .cot-hp{position:absolute!important;left:-9999px!important;width:1px;height:1px;overflow:hidden}
 
 @media (prefers-reduced-motion:reduce){.cot *{animation:none!important;transition:none!important}}

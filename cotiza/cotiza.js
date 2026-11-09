@@ -110,8 +110,19 @@
     } else { mapa.invalidateSize(); mapa.setView(centro, destino ? 20 : 12); }
     d.referencia = destino; // si no confirma el punto, la distancia sale de la dirección o la comuna
   }
-  $('cotConfirmar').addEventListener('click', () => { if (mapa) { const c = mapa.getCenter(); d.punto = [+c.lat.toFixed(6), +c.lng.toFixed(6)]; } ir('uso'); });
-  $('cotSinMapa').addEventListener('click', () => { d.punto = null; ir('uso'); });
+  const trasMapa = () => ir(d.leida ? 'contacto' : 'uso');
+  $('cotConfirmar').addEventListener('click', () => { if (mapa) { const c = mapa.getCenter(); d.punto = [+c.lat.toFixed(6), +c.lng.toFixed(6)]; } trasMapa(); });
+  $('cotSinMapa').addEventListener('click', () => { d.punto = null; trasMapa(); });
+  // Si la dirección leída no es la de la casa, se corrige y se vuelve al camino normal con la boleta adjunta
+  caja.querySelector('[data-ir-ubicacion]').addEventListener('click', () => {
+    d.leida = false; caja.classList.remove('leida'); ORDEN = CON_BOLETA; armarBarra(); ir('ubicacion');
+  });
+  // «Últimos detalles»: botones de una sola elección
+  caja.querySelectorAll('[data-det]').forEach(g => g.addEventListener('click', e => {
+    const b = e.target.closest('[data-v]'); if (!b) return;
+    g.querySelectorAll('[data-v]').forEach(x => x.setAttribute('aria-pressed', x === b));
+  }));
+  const det = k => caja.querySelector(`[data-det="${k}"] [aria-pressed="true"]`)?.dataset.v;
 
   // ---- 3 · Para qué
   const aviso = (id, html, boton, motivo) => {
@@ -217,7 +228,13 @@
       const leido = aplicarBoleta(b);
       msj.textContent = '✓ Leímos tu boleta: ' + (leido.join(' · ') || 'revisa los datos');
       $('cotUbiAyuda').textContent = 'Lo llenamos con tu boleta. Revisa que esté bien y sigue.';
-      luego(() => ir('ubicacion'));
+      // Con comuna, dirección y consumo leídos quedan solo dos pantallas: el techo en el mapa y «Últimos detalles»
+      if (d.comuna && dir.value.trim().length >= 3 && d.gasto > 0) {
+        d.leida = true; d.direccion = dir.value.trim(); d.uso = 'casa';
+        ORDEN = ['modo', 'mapa', 'contacto']; armarBarra(); caja.classList.add('leida');
+        $('cotDetTemp').hidden = !!d.temporada;
+        setTimeout(() => ir('mapa'), 1400);
+      } else setTimeout(() => ir('ubicacion'), 1400);
     } catch (e) {
       msj.textContent = (e.message || 'No pudimos leer la boleta.') + ' Igual la adjuntamos; sigue y completa lo que falte.';
       setTimeout(() => ir('ubicacion'), 2200);
@@ -271,6 +288,13 @@
     fallas.forEach(([i, m]) => errorCampo(i, m));
     const primera = fallas.find(([, m]) => m);
     if (primera) return primera[0].focus();
+    if (d.leida) {
+      if (!d.temporada && !det('temporada')) { $('cotDetErr').textContent = 'Elige una opción'; return; }
+      $('cotDetErr').textContent = '';
+      d.metros = +det('metros'); d.temporada = d.temporada || det('temporada');
+      d.uso = det('vivienda');
+      d.motivo = d.uso === 'casa' ? '' : d.uso;
+    }
     d.contacto = { nombre: f.nombre.value.trim() + ' ' + f.apellido.value.trim(), telefono: '+56' + f.telefono.value.replace(/\D/g, '').replace(/^56/, ''), correo: f.correo.value.trim() };
     if (d.motivo) { enviar(null); return mostrarGracias(); }
     calcular();
