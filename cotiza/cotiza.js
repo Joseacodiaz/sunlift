@@ -7,7 +7,7 @@
   const BASE = document.getElementById('cotiza').dataset.base || '/';
   const quieto = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const LEADS = 'https://sunlift.netlify.app/'; // formulario "cotizacion" de Netlify
-  const PUENTE = 'https://sunlift.netlify.app/api/cotizacion'; // guarda cada cotización en la consola residencial de Marcelo
+  const PUENTE = 'https://sunlift.netlify.app/api/cotizacion'; // cotiza en vivo con la consola de Marcelo y guarda la propuesta en su CRM
   // Dos caminos: responder todo, o subir la boleta y saltarse condominio, quién cobra la luz y temporada
   const COMPLETO = ['modo', 'ubicacion', 'mapa', 'uso', 'condominio', 'boleta', 'gasto', 'temporada', 'medidor', 'contacto'];
   const CON_BOLETA = ['modo', 'ubicacion', 'mapa', 'uso', 'gasto', 'medidor', 'contacto'];
@@ -347,7 +347,16 @@
     ];
     if (cero <= 1) opciones.shift();
     enviar(opciones);
-    setTimeout(() => { clearInterval(reloj); pintar(); ir('resultado'); crearLink(); aConsola(opciones.find(x => x.id === 'cuenta-cero') || opciones[0]); }, quieto ? 300 : 2700);
+    // precios en vivo de la consola de Marcelo; si no responde a tiempo, quedan los de respaldo (precios.json)
+    const espera = new Promise(r => setTimeout(r, quieto ? 300 : 2700));
+    Promise.all([aConsola(), espera]).then(([vivo]) => {
+      if (vivo?.opciones) vivo.opciones.forEach(v => {
+        const o = opciones.find(x => x.id === v.id); if (!o || !(v.total > 0)) return;
+        Object.assign(o, { paneles: v.paneles, kwp: v.kwp, total: v.total, ahorroMes: v.ahorroAnual / 12, retorno: v.payback || o.retorno, cubre: Math.min(1, v.cubre || o.cubre), vivo: true });
+        if (o.bat && v.bateria) Object.assign(o.bat, { modelo: v.bateria.modelo, kwh: v.bateria.kwh, horas: Math.round(v.bateria.horas) });
+      });
+      clearInterval(reloj); pintar(); ir('resultado'); crearLink(vivo?.propuestaUrl);
+    });
   }
 
   // ---- 10 · Resultado: tarjetas con imagen; se elige una y se agenda la visita
@@ -499,15 +508,21 @@
   // ---- Link propio de la propuesta (Netlify Blobs) para mandarla por WhatsApp o correo y contar aperturas
   const PROPUESTAS = 'https://sunlift.netlify.app/api/propuesta';
   const evento = tipo => { if (d.idLink) fetch(PROPUESTAS + '/evento', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: d.idLink, tipo }) }).catch(() => {}); };
-  async function crearLink() {
+  async function crearLink(urlConsola) {
     try {
+      if (urlConsola) { compartir(urlConsola); return; } // la propuesta de la consola ya cuenta aperturas en su CRM
       const r = await fetch(PROPUESTAS, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
         nombre: d.contacto.nombre.split(' ')[0], comuna: d.comuna,
         cuenta_luz: d.unidad === 'clp' ? '$' + fmt(d.gasto) : fmt(d.gasto) + ' kWh',
         opciones, elegida,
       }) });
       const { id } = await r.json(); if (!id) return;
-      d.idLink = id; d.link = location.origin + BASE + 'p/?id=' + id;
+      d.idLink = id; compartir(location.origin + BASE + 'p/?id=' + id);
+    } catch { /* sin link igual se puede avanzar */ }
+  }
+  function compartir(link) {
+    try {
+      d.link = link;
       const txt = `Mi propuesta solar de SunLift: ${d.link}`;
       $('cotWa').href = 'https://wa.me/?text=' + encodeURIComponent(txt);
       $('cotMail').href = 'mailto:' + (d.contacto.correo || '') + '?subject=' + encodeURIComponent('Mi propuesta solar de SunLift') + '&body=' + encodeURIComponent(txt);
@@ -519,25 +534,23 @@
     try { await navigator.clipboard.writeText(d.link); $('cotCopiar').textContent = '¡Copiado!'; } catch { prompt('Copia tu link:', d.link); }
   });
 
-  // ---- La propuesta armada viaja a la consola de Tito (vía el puente de Netlify, que guarda el token)
-  async function aConsola(o) {
-    const lugar = d.punto || d.referencia;
+  // ---- Cotiza en vivo con la consola de Marcelo y deja la propuesta en su CRM (vía la función de Netlify,
+  // que guarda el usuario de la consola). Devuelve { propuestaUrl, opciones } o null si no respondió.
+  async function aConsola() {
+    const lugar = d.punto || d.referencia, rec = opciones.find(x => x.id === 'cuenta-cero') || opciones[0];
     const cuerpo = {
       cliente: { nombre: d.contacto.nombre, telefono: d.contacto.telefono, correo: d.contacto.correo || undefined },
       ubicacion: { direccion: d.direccion, comuna: d.comuna, region: d.region, ...(lugar ? { lat: lugar[0], lng: lugar[1] } : {}) },
       vivienda: { tipo: d.uso || 'casa', condominio: d.condominio === 'si', ...(d.lote ? { lote: d.lote } : {}) },
-      consumo: { monto: d.gasto, unidad: d.unidad, temporada: d.temporada },
+      consumo: { monto: d.gasto, unidad: d.unidad, temporada: d.temporada || '' },
       instalacion: { metrosAlMedidor: d.metros },
-      propuesta: { paneles: o.paneles, ...(o.kwp ? { kwp: o.kwp } : {}), conBateria: !!o.bat, ...(o.bat ? { bateriaKwh: o.bat.kwh } : {}) },
+      opciones: opciones.map(o => ({ id: o.id, kwp: o.kwp, conBateria: !!o.bat })), elegida: rec.id,
     };
     try {
-      const r = await fetch(PUENTE, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) });
+      const r = await fetch(PUENTE, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo), signal: AbortSignal.timeout(15000) });
       const res = await r.json();
-      if (res.propuestaUrl && /^https:\/\//.test(res.propuestaUrl)) {
-        const a = Object.assign(document.createElement('a'), { href: res.propuestaUrl, target: '_blank', rel: 'noopener', className: 'cot-sig', textContent: 'Ver mi propuesta →' });
-        $('cotAvanzaMsj').after(a);
-      }
-    } catch { /* el lead ya llegó por el formulario; la consola puede recibirlo después */ }
+      return res.propuestaUrl && /^https:\/\//.test(res.propuestaUrl) ? res : null;
+    } catch { return null; /* el lead ya llegó por el formulario */ }
   }
   $('cotRehacer').addEventListener('click', () => {
     historial = [];
