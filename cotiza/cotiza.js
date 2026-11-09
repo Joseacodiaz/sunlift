@@ -34,8 +34,8 @@
     $('cotBarra').setAttribute('aria-label', `Paso ${Math.min(hecho, ORDEN.length)} de ${ORDEN.length}`);
     caja.classList.toggle('ancha', paso === 'resultado');
     if (paso === 'mapa') abrirMapa();
-    const top = caja.getBoundingClientRect().top;
-    if (top < 0 || top > innerHeight * .5) caja.scrollIntoView({ behavior: quieto ? 'auto' : 'smooth', block: 'start' });
+    if (modal && modal.open) modal.scrollTo({ top: 0, behavior: quieto ? 'auto' : 'smooth' });
+    else { const top = caja.getBoundingClientRect().top; if (top < 0 || top > innerHeight * .5) caja.scrollIntoView({ behavior: quieto ? 'auto' : 'smooth', block: 'start' }); }
     const q = pasos[paso].querySelector('.cot-q');
     if (q && historial.length) q.focus({ preventScroll: true });
   }
@@ -567,7 +567,24 @@
   // Segunda entrada (debajo de «Un día con SunLift»): trae región, comuna y dirección y sigue aquí, en el mapa
   let listo; const cargado = new Promise(r => { listo = r; });
   const esperar = setInterval(() => { if (P) { clearInterval(esperar); listo(); } }, 100);
+  // Ventana: la misma caja del cotizador se muda a un <dialog> y vuelve a su lugar al cerrarlo
+  const lugar = document.createComment('cotizador'); caja.before(lugar);
+  const modal = document.createElement('dialog');
+  modal.className = 'cot cot-modal'; modal.setAttribute('data-lenis-prevent', ''); modal.setAttribute('aria-label', 'Cotizador SunLift');
+  modal.innerHTML = '<button type="button" class="cot-modal-x" aria-label="Cerrar cotizador">×</button>';
+  document.body.append(modal);
+  modal.querySelector('.cot-modal-x').addEventListener('click', () => modal.close());
+  modal.addEventListener('click', e => { if (e.target === modal) modal.close(); }); // clic fuera de la caja
+  modal.addEventListener('close', () => { lugar.after(caja); document.documentElement.classList.remove('cot-abierto'); });
+  function abrir(modo) {
+    if (!modal.open) { modal.append(caja); modal.showModal(); document.documentElement.classList.add('cot-abierto'); }
+    if (actual !== 'modo') { historial = []; ir('modo', true); }
+    const b = modo && caja.querySelector(`[data-grupo="modo"] [data-valor="${modo}"]`);
+    if (b) b.click(); // sigue en el mismo gesto: con «boleta» se abre el selector de archivo
+  }
+
   window.SunLiftCotiza = {
+    abrir,
     cargado,
     regiones: () => [...selR.options].slice(1).map(o => [o.value, o.text]),
     comunas: region => Object.keys(P.comunas).filter(c => P.comunas[c][0] === region).sort((a, b) => a.localeCompare(b, 'es')),
