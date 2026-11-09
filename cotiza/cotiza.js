@@ -225,7 +225,7 @@
       selR.value = P.comunas[comuna][0]; selR.dispatchEvent(new Event('change'));
       selC.value = comuna; selC.dispatchEvent(new Event('change')); leido.push(comuna);
     }
-    if (b.direccion) { dir.value = b.direccion.replace(/\b\w+/g, w => w[0].toUpperCase() + w.slice(1).toLowerCase()).slice(0, 120); dir.disabled = false; validar1(); }
+    if (b.direccion) { dir.value = b.direccion.toLowerCase().replace(/(^|\s)(\S)/g, (m, e, l) => e + l.toUpperCase()).slice(0, 120); dir.disabled = false; validar1(); } // título con tildes: «José», no «JosÉ»
     if (b.consumo_kwh > 0) { unidad('kwh', true); ponerGasto(Math.round(b.consumo_kwh), false); leido.push(Math.round(b.consumo_kwh) + ' kWh'); }
     else if (b.total_pagar > 0) { unidad('clp', true); ponerGasto(Math.round(b.total_pagar), false); }
     if (b.total_pagar > 0) leido.push('$' + fmt(b.total_pagar));
