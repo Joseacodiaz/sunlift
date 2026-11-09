@@ -9,8 +9,8 @@
   const LEADS = 'https://sunlift.netlify.app/'; // formulario "cotizacion" de Netlify
   const PUENTE = 'https://sunlift.netlify.app/api/cotizacion'; // reenvía a la consola de propuestas de Tito
   // Dos caminos: responder todo, o subir la boleta y saltarse condominio, quién cobra la luz y temporada
-  const COMPLETO = ['ubicacion', 'mapa', 'uso', 'modo', 'condominio', 'boleta', 'gasto', 'temporada', 'medidor', 'contacto'];
-  const CON_BOLETA = ['ubicacion', 'mapa', 'uso', 'modo', 'gasto', 'medidor', 'contacto'];
+  const COMPLETO = ['modo', 'ubicacion', 'mapa', 'uso', 'condominio', 'boleta', 'gasto', 'temporada', 'medidor', 'contacto'];
+  const CON_BOLETA = ['modo', 'ubicacion', 'mapa', 'uso', 'gasto', 'medidor', 'contacto'];
   let ORDEN = COMPLETO;
   const pasos = Object.fromEntries([...caja.querySelectorAll('.cot-paso')].map(p => [p.dataset.paso, p]));
   const d = { region: '', comuna: '', direccion: '', punto: null, uso: '', condominio: '', lote: '', boleta: '', unidad: 'clp', gasto: 0, metros: 15, motivo: '', temporada: '', archivo: null, pago: 'credito', plazo: 60, tasa: 1 };
@@ -116,7 +116,7 @@
   grupo('uso', v => {
     d.uso = v; d.motivo = ''; $('cotAvisoUso').hidden = true;
     if (v !== 'casa') { d.condominio = ''; d.lote = ''; d.boleta = ''; d.gasto = 0; }
-    if (v === 'casa') return luego(() => ir('modo'));
+    if (v === 'casa') return luego(() => ir(d.modo === 'boleta' ? 'gasto' : 'condominio'));
     if (v === 'departamento') aviso('cotAvisoUso', '<p>Por ahora instalamos en casas, porque en un edificio el techo es de todos y cada depto tiene su propio medidor.</p><p>Si el edificio quiere paneles para los espacios comunes, déjanos tus datos y lo vemos con la administración.</p>', 'Dejar mis datos', 'departamento');
     else aviso('cotAvisoUso', '<p>Para empresas y campos el sistema se diseña a medida, según tu tarifa y tus horarios de consumo.</p><p>Déjanos tus datos y un especialista te prepara la propuesta.</p>', 'Hablar con un especialista', 'empresa');
   });
@@ -124,10 +124,10 @@
   // ---- 3b · Modo: boleta (menos preguntas; la boleta trae consumo, distribuidora e historial del año) o todas
   grupo('modo', v => {
     d.modo = v; ORDEN = v === 'boleta' ? CON_BOLETA : COMPLETO; armarBarra();
-    if (v === 'boleta') { d.boleta = 'distribuidora'; d.condominio = ''; d.temporada = 'ver boleta'; }
     caja.classList.toggle('modo-boleta', v === 'boleta');
+    if (v === 'boleta') { d.boleta = 'distribuidora'; d.condominio = ''; archivo.click(); return; } // se lee al elegir el archivo
     ponerGasto(d.gasto, false);
-    luego(() => ir(v === 'boleta' ? 'gasto' : 'condominio'));
+    luego(() => ir('ubicacion'));
   });
 
   // ---- 4 · Condominio
@@ -194,7 +194,52 @@
       l.querySelector('[data-boleta-sub]').textContent = '✓ ' + (f.name.length > 34 ? f.name.slice(0, 31) + '…' : f.name);
     });
     vivo('Boleta lista: ' + f.name);
+    if (d.modo === 'boleta' && actual === 'modo') leerBoleta(f);
   });
+
+  // ---- Lectura automática: LIFTY OS le pasa la boleta a Claude y devuelve los datos; aquí se llenan los campos
+  const LECTOR = 'https://liftyos.com/api/sunlift/leer-boleta';
+  const sinTilde = x => (x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  async function leerBoleta(f) {
+    const msj = $('cotLeyendo'); msj.hidden = false;
+    msj.innerHTML = '<span class="pts" aria-hidden="true"><i></i><i></i><i></i></span> Leyendo tu boleta…';
+    try {
+      const fd = new FormData(); fd.append('boleta', f, f.name);
+      const r = await fetch(LECTOR, { method: 'POST', body: fd });
+      const b = await r.json();
+      if (!r.ok) throw new Error(b.error || 'No pudimos leer la boleta.');
+      const leido = aplicarBoleta(b);
+      msj.textContent = '✓ Leímos tu boleta: ' + (leido.join(' · ') || 'revisa los datos');
+      $('cotUbiAyuda').textContent = 'Lo llenamos con tu boleta. Revisa que esté bien y sigue.';
+      luego(() => ir('ubicacion'));
+    } catch (e) {
+      msj.textContent = (e.message || 'No pudimos leer la boleta.') + ' Igual la adjuntamos; sigue y completa lo que falte.';
+      setTimeout(() => ir('ubicacion'), 2200);
+    }
+  }
+  function aplicarBoleta(b) {
+    const leido = [];
+    if (b.distribuidora) { d.distribuidora = b.distribuidora; leido.push(b.distribuidora); }
+    const comuna = b.comuna && Object.keys(P.comunas).find(c => sinTilde(c) === sinTilde(b.comuna));
+    if (comuna) {
+      selR.value = P.comunas[comuna][0]; selR.dispatchEvent(new Event('change'));
+      selC.value = comuna; selC.dispatchEvent(new Event('change')); leido.push(comuna);
+    }
+    if (b.direccion) { dir.value = b.direccion.replace(/\b\w+/g, w => w[0].toUpperCase() + w.slice(1).toLowerCase()).slice(0, 120); dir.disabled = false; validar1(); }
+    if (b.consumo_kwh > 0) { unidad('kwh', true); ponerGasto(Math.round(b.consumo_kwh), false); leido.push(Math.round(b.consumo_kwh) + ' kWh'); }
+    else if (b.total_pagar > 0) { unidad('clp', true); ponerGasto(Math.round(b.total_pagar), false); }
+    if (b.total_pagar > 0) leido.push('$' + fmt(b.total_pagar));
+    // Temporada desde el historial: invierno (may–ago) contra verano (dic–feb)
+    const h = Array.isArray(b.historial_kwh) ? b.historial_kwh : [];
+    const prom = re => { const v = h.filter(x => re.test(sinTilde(x.mes)) && x.kwh > 0).map(x => x.kwh); return v.length ? v.reduce((a, c) => a + c, 0) / v.length : 0; };
+    const inv = prom(/^(may|jun|jul|ago)/), ver = prom(/^(dic|ene|feb)/);
+    if (inv && ver) { d.temporada = inv > ver * 1.15 ? 'invierno' : ver > inv * 1.15 ? 'verano' : 'parejo'; leido.push('más consumo en ' + (d.temporada === 'parejo' ? 'todo el año' : d.temporada)); }
+    if (b.titular) {
+      const [nom, ...ape] = b.titular.toLowerCase().split(/\s+/).map(w => w[0].toUpperCase() + w.slice(1));
+      form.elements.nombre.value = nom || ''; form.elements.apellido.value = ape.join(' ');
+    }
+    return leido;
+  }
 
   // ---- 7 · Distancia al medidor
   grupo('medidor', v => { d.metros = +v; luego(() => ir('contacto')); });
@@ -499,5 +544,5 @@
     },
   };
 
-  ir('ubicacion', true);
+  ir('modo', true);
 })();

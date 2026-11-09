@@ -201,6 +201,10 @@
 .modo-boleta .cot-solo-boleta{display:block;margin-top:.8rem}
 .modo-boleta [data-paso="gasto"] .cot-boleta{order:-1;border-style:solid;border-color:var(--c-lime)}
 .modo-boleta [data-boleta-aviso]{display:none}
+.cot-leyendo{margin-top:1rem;padding:.85rem 1rem;border-radius:.9rem;background:rgba(182,243,68,.1);color:#fff;font-weight:600;font-size:.92rem;display:flex;align-items:center;gap:.7rem}
+.cot-leyendo .pts{display:inline-grid;grid-template-columns:repeat(3,6px);gap:5px}
+.cot-leyendo .pts i{width:6px;height:6px;border-radius:2px;background:var(--c-lime);animation:cotPt 1.2s ease-in-out infinite}
+.cot-leyendo .pts i:nth-child(2){animation-delay:.18s}.cot-leyendo .pts i:nth-child(3){animation-delay:.36s}
 .cot-hp{position:absolute!important;left:-9999px!important;width:1px;height:1px;overflow:hidden}
 
 @media (prefers-reduced-motion:reduce){.cot *{animation:none!important;transition:none!important}}
