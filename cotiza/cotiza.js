@@ -7,7 +7,7 @@
   const BASE = document.getElementById('cotiza').dataset.base || '/';
   const quieto = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const LEADS = 'https://sunlift.netlify.app/'; // formulario "cotizacion" de Netlify
-  const PUENTE = 'https://sunlift.netlify.app/api/cotizacion'; // reenvía a la consola de propuestas de Tito
+  const PUENTE = 'https://sunlift.netlify.app/api/cotizacion'; // guarda cada cotización en la consola residencial de Marcelo
   // Dos caminos: responder todo, o subir la boleta y saltarse condominio, quién cobra la luz y temporada
   const COMPLETO = ['modo', 'ubicacion', 'mapa', 'uso', 'condominio', 'boleta', 'gasto', 'temporada', 'medidor', 'contacto'];
   const CON_BOLETA = ['modo', 'ubicacion', 'mapa', 'uso', 'gasto', 'medidor', 'contacto'];
@@ -347,7 +347,7 @@
     ];
     if (cero <= 1) opciones.shift();
     enviar(opciones);
-    setTimeout(() => { clearInterval(reloj); pintar(); ir('resultado'); crearLink(); }, quieto ? 300 : 2700);
+    setTimeout(() => { clearInterval(reloj); pintar(); ir('resultado'); crearLink(); aConsola(opciones.find(x => x.id === 'cuenta-cero') || opciones[0]); }, quieto ? 300 : 2700);
   }
 
   // ---- 10 · Resultado: tarjetas con imagen; se elige una y se agenda la visita
@@ -494,7 +494,6 @@
     evento(tipo);
     $('cotAvanzaMsj').textContent = TEXTO_AVANZA[tipo](d.contacto.telefono);
     caja.querySelectorAll('[data-avanza]').forEach(x => x.setAttribute('aria-pressed', x === b));
-    if (tipo === 'visita') aConsola(o);
   }));
 
   // ---- Link propio de la propuesta (Netlify Blobs) para mandarla por WhatsApp o correo y contar aperturas
@@ -526,10 +525,10 @@
     const cuerpo = {
       cliente: { nombre: d.contacto.nombre, telefono: d.contacto.telefono, correo: d.contacto.correo || undefined },
       ubicacion: { direccion: d.direccion, comuna: d.comuna, region: d.region, ...(lugar ? { lat: lugar[0], lng: lugar[1] } : {}) },
-      vivienda: { tipo: 'casa', condominio: d.condominio === 'si', ...(d.lote ? { lote: d.lote } : {}) },
+      vivienda: { tipo: d.uso || 'casa', condominio: d.condominio === 'si', ...(d.lote ? { lote: d.lote } : {}) },
       consumo: { monto: d.gasto, unidad: d.unidad, temporada: d.temporada },
       instalacion: { metrosAlMedidor: d.metros },
-      propuesta: { paneles: o.paneles, conBateria: !!o.bat, ...(o.bat ? { bateriaKwh: o.bat.kwh } : {}) },
+      propuesta: { paneles: o.paneles, ...(o.kwp ? { kwp: o.kwp } : {}), conBateria: !!o.bat, ...(o.bat ? { bateriaKwh: o.bat.kwh } : {}) },
     };
     try {
       const r = await fetch(PUENTE, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) });
