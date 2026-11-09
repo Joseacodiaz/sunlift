@@ -86,7 +86,13 @@
       document.head.append(css, js);
     });
   }
+  // Esri ubica el número de casa (OpenStreetMap en Chile suele dar solo la calle); OSM queda de respaldo
   async function buscar(q) {
+    try {
+      const r = await fetch('https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?f=json&maxLocations=1&countryCode=CHL&SingleLine=' + encodeURIComponent(q));
+      const [c] = (await r.json()).candidates || [];
+      if (c && c.score >= 80) return [c.location.y, c.location.x];
+    } catch { /* sigue con OSM */ }
     try {
       const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=cl&accept-language=es&q=' + encodeURIComponent(q));
       const [h] = await r.json();
@@ -99,9 +105,9 @@
     const centro = destino || [-33.4489, -70.6693];
     if (!mapa) {
       $('cotMapa').innerHTML = '';
-      mapa = L.map('cotMapa', { zoomControl: true, attributionControl: true }).setView(centro, destino ? 19 : 12);
+      mapa = L.map('cotMapa', { zoomControl: true, attributionControl: true }).setView(centro, destino ? 20 : 12);
       L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 20, maxNativeZoom: 19, attribution: 'Imágenes © Esri' }).addTo(mapa);
-    } else { mapa.invalidateSize(); mapa.setView(centro, destino ? 19 : 12); }
+    } else { mapa.invalidateSize(); mapa.setView(centro, destino ? 20 : 12); }
     d.referencia = destino; // si no confirma el punto, la distancia sale de la dirección o la comuna
   }
   $('cotConfirmar').addEventListener('click', () => { if (mapa) { const c = mapa.getCenter(); d.punto = [+c.lat.toFixed(6), +c.lng.toFixed(6)]; } ir('uso'); });
