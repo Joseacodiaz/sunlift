@@ -8,7 +8,10 @@
   const quieto = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const LEADS = 'https://sunlift.netlify.app/'; // formulario "cotizacion" de Netlify
   const PUENTE = 'https://sunlift.netlify.app/api/cotizacion'; // reenvía a la consola de propuestas de Tito
-  const ORDEN = ['ubicacion', 'mapa', 'uso', 'condominio', 'boleta', 'gasto', 'temporada', 'medidor', 'contacto'];
+  // Dos caminos: responder todo, o subir la boleta y saltarse condominio, quién cobra la luz y temporada
+  const COMPLETO = ['ubicacion', 'mapa', 'uso', 'modo', 'condominio', 'boleta', 'gasto', 'temporada', 'medidor', 'contacto'];
+  const CON_BOLETA = ['ubicacion', 'mapa', 'uso', 'modo', 'gasto', 'medidor', 'contacto'];
+  let ORDEN = COMPLETO;
   const pasos = Object.fromEntries([...caja.querySelectorAll('.cot-paso')].map(p => [p.dataset.paso, p]));
   const d = { region: '', comuna: '', direccion: '', punto: null, uso: '', condominio: '', lote: '', boleta: '', unidad: 'clp', gasto: 0, metros: 15, motivo: '', temporada: '', archivo: null, pago: 'credito', plazo: 60, tasa: 1 };
   let P = null, actual = 'ubicacion', historial = [], mapa = null, opciones = [], elegida = 1, ctx = null, arma = null;
@@ -18,8 +21,9 @@
   const vivo = t => { $('cotVivo').textContent = t; };
 
   // ---- Barra de avance
-  $('cotBarra').innerHTML = ORDEN.map(() => '<li></li>').join('');
-  const barra = [...$('cotBarra').children];
+  let barra = [];
+  const armarBarra = () => { $('cotBarra').innerHTML = ORDEN.map(() => '<li></li>').join(''); barra = [...$('cotBarra').children]; };
+  armarBarra();
 
   function ir(paso, volviendo) {
     if (!volviendo && paso !== actual) historial.push(actual);
@@ -112,9 +116,18 @@
   grupo('uso', v => {
     d.uso = v; d.motivo = ''; $('cotAvisoUso').hidden = true;
     if (v !== 'casa') { d.condominio = ''; d.lote = ''; d.boleta = ''; d.gasto = 0; }
-    if (v === 'casa') return luego(() => ir('condominio'));
+    if (v === 'casa') return luego(() => ir('modo'));
     if (v === 'departamento') aviso('cotAvisoUso', '<p>Por ahora instalamos en casas, porque en un edificio el techo es de todos y cada depto tiene su propio medidor.</p><p>Si el edificio quiere paneles para los espacios comunes, déjanos tus datos y lo vemos con la administración.</p>', 'Dejar mis datos', 'departamento');
     else aviso('cotAvisoUso', '<p>Para empresas y campos el sistema se diseña a medida, según tu tarifa y tus horarios de consumo.</p><p>Déjanos tus datos y un especialista te prepara la propuesta.</p>', 'Hablar con un especialista', 'empresa');
+  });
+
+  // ---- 3b · Modo: boleta (menos preguntas; la boleta trae consumo, distribuidora e historial del año) o todas
+  grupo('modo', v => {
+    d.modo = v; ORDEN = v === 'boleta' ? CON_BOLETA : COMPLETO; armarBarra();
+    if (v === 'boleta') { d.boleta = 'distribuidora'; d.condominio = ''; d.temporada = 'ver boleta'; }
+    caja.classList.toggle('modo-boleta', v === 'boleta');
+    ponerGasto(d.gasto, false);
+    luego(() => ir(v === 'boleta' ? 'gasto' : 'condominio'));
   });
 
   // ---- 4 · Condominio
@@ -154,11 +167,11 @@
     }
     d.gasto = n;
     gasto.value = n ? fmt(n) : '';
-    sig6.disabled = !(d.unidad === 'clp' ? n >= 10000 && n <= 5000000 : n >= 30 && n <= 20000);
+    sig6.disabled = !(d.unidad === 'clp' ? n >= 10000 && n <= 5000000 : n >= 30 && n <= 20000) || (d.modo === 'boleta' && !d.archivo);
   }
   gasto.addEventListener('input', () => ponerGasto(+gasto.value.replace(/\D/g, '')));
   gasto.addEventListener('keydown', e => { if (e.key === 'Enter' && !sig6.disabled) sig6.click(); });
-  sig6.addEventListener('click', () => ir('temporada'));
+  sig6.addEventListener('click', () => ir(d.modo === 'boleta' ? 'medidor' : 'temporada'));
 
   // ---- 6b · Cuándo paga más luz (dato para la consola de propuestas)
   grupo('temporada', v => { d.temporada = v; luego(() => ir('medidor')); });
@@ -174,6 +187,7 @@
     if (!TIPOS.test(f.type) && !/\.(heic|heif)$/i.test(f.name)) { $('cotArchivoErr').textContent = 'Sube una foto (JPG, PNG o HEIC) o un PDF.'; archivo.value = ''; return; }
     if (f.size > 7.5 * 1024 * 1024) { $('cotArchivoErr').textContent = 'El archivo pesa más de 7,5 MB. Prueba con una foto o un PDF más liviano.'; archivo.value = ''; return; }
     d.archivo = f;
+    ponerGasto(d.gasto, false);
     caja.querySelectorAll('[data-boleta]').forEach(l => {
       l.classList.add('lista');
       l.querySelector('[data-boleta-estado]').textContent = 'Cambiar';

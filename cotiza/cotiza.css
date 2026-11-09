@@ -196,6 +196,11 @@
 .cot-fin-letra{font-size:.74rem;color:rgba(255,255,255,.45);line-height:1.45}
 .cot-card .credito{margin:-.35rem 0 0;font-size:.82rem;color:rgba(255,255,255,.7)}
 .cot-card .credito b{color:var(--c-lime)}
+/* Camino «escanear boleta»: la boleta va primero y es obligatoria; se ocultan los textos del otro camino */
+.cot-solo-boleta{display:none}
+.modo-boleta .cot-solo-boleta{display:block;margin-top:.8rem}
+.modo-boleta [data-paso="gasto"] .cot-boleta{order:-1;border-style:solid;border-color:var(--c-lime)}
+.modo-boleta [data-boleta-aviso]{display:none}
 .cot-hp{position:absolute!important;left:-9999px!important;width:1px;height:1px;overflow:hidden}
 
 @media (prefers-reduced-motion:reduce){.cot *{animation:none!important;transition:none!important}}
